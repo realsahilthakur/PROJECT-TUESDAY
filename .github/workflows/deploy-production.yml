@@ -1,0 +1,66 @@
+# .github/workflows/deploy-production.yml
+
+name: CD - Deploy to Production
+
+# This workflow can only be triggered manually and from the `main` branch
+on:
+  workflow_dispatch:
+    inputs:
+      commit_id:
+        description: 'Commit ID to deploy (optional, defaults to latest)'
+        required: false
+        type: string
+    
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    
+    # Define GitHub secrets for sensitive data
+    # SSH_HOST_PROD: IP address or hostname of the production server
+    # SSH_USER_PROD: Username for SSH access
+    # SSH_KEY_PROD: Private SSH key to authenticate
+    # MONGO_URI_PROD: MongoDB connection string for the production environment
+    # CLERK_SECRET_KEY_PROD: Clerk secret key for the production environment
+    
+    steps:
+      # Step 1: Download the build artifact.
+      # For a production deployment, you would typically download the artifact
+      # from a successful run on the `main` branch.
+      - name: Download application build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: todo-app-build
+
+      # Step 2: Deploy to Production via SSH and rsync
+      - name: Deploy to Production Environment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST_PROD }}
+          username: ${{ secrets.SSH_USER_PROD }}
+          key: ${{ secrets.SSH_KEY_PROD }}
+          script: |
+            # Create a new directory for the new version to allow for zero-downtime deployment
+            NEW_DIR="/var/www/production-app-$(date +%s)"
+            mkdir -p $NEW_DIR
+            
+            # Use rsync to transfer files
+            rsync -avz --exclude 'node_modules' --delete ./build/backend $NEW_DIR/
+            rsync -avz --exclude 'node_modules' --delete ./build/frontend $NEW_DIR/
+            
+            # Navigate to the backend directory and install dependencies
+            cd $NEW_DIR/backend
+            npm install
+            
+            # Atomically switch the symlink to the new version
+            # This is a common strategy for zero-downtime deployments
+            # Be sure to handle your web server (e.g., Nginx) configuration to point to the `current` symlink
+            ln -sfn $NEW_DIR /var/www/production-app/current
+            
+            # Restart the application service
+            echo "Restarting application service for production..."
+            # systemctl restart my-app-production
+            
+            echo "Deployment to production environment successful!"
+
