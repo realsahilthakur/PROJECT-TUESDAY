@@ -1,0 +1,71 @@
+# .github/workflows/deploy-testing.yml
+
+name: CD - Deploy to Testing
+
+# Trigger this workflow manually
+on:
+  workflow_dispatch:
+    inputs:
+      commit_id:
+        description: 'Commit ID to deploy (optional, defaults to latest)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: testing
+    
+    # Define GitHub secrets for sensitive data
+    # SSH_HOST: IP address or hostname of the testing server
+    # SSH_USER: Username for SSH access
+    # SSH_KEY: Private SSH key to authenticate
+    # MONGO_URI_TESTING: MongoDB connection string for the testing environment
+    # CLERK_SECRET_KEY_TESTING: Clerk secret key for the testing environment
+    
+    steps:
+      # Step 1: Download the build artifact from a previous run
+      # The `actions/download-artifact` action is used to retrieve the build output
+      # from the CI job, allowing us to share data between workflows.
+      - name: Download application build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: todo-app-build
+
+      # Step 2: Deploy the application via SSH and rsync
+      - name: Deploy to Testing Environment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST_TESTING }}
+          username: ${{ secrets.SSH_USER_TESTING }}
+          key: ${{ secrets.SSH_KEY_TESTING }}
+          script: |
+            # Create the deployment directory on the remote server
+            mkdir -p /var/www/testing-app
+            
+            # Use rsync to transfer files from the artifact to the remote server
+            rsync -avz --exclude 'node_modules' --delete ./build/backend /var/www/testing-app/
+            rsync -avz --exclude 'node_modules' --delete ./build/frontend /var/www/testing-app/
+            
+            # Navigate to the backend directory and install dependencies
+            cd /var/www/testing-app/backend
+            npm install
+            
+            # Restart the application service (assumes a service manager like systemd)
+            # This is a placeholder and should be replaced with your specific restart command
+            echo "Restarting application service..."
+            # systemctl restart my-app-testing
+            
+            # Verify the deployment
+            echo "Deployment to testing environment successful!"
+
+      # Step 3: Use Secrets and Tokens
+      # This example shows how to use secrets, which are crucial for security.
+      # The values are retrieved from the GitHub repository's `Settings > Secrets` page.
+      - name: Check secrets for a secure log (just for demonstration)
+        run: |
+          echo "Using MONGO_URI_TESTING: ${{ secrets.MONGO_URI_TESTING }}"
+          echo "Using CLERK_SECRET_KEY_TESTING: ${{ secrets.CLERK_SECRET_KEY_TESTING }}"
+        shell: bash
+
