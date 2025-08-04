@@ -1,0 +1,58 @@
+# .github/workflows/ci.yml
+
+name: CI - Build and Test
+
+# Trigger this workflow on pushes to any branch
+on:
+  push:
+    branches:
+      - '**' # Run on all branches
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Step 3: Install and build the backend dependencies
+      - name: Install backend dependencies
+        run: npm install
+        working-directory: ./Backend
+
+      # Step 4: Run backend unit tests (if any exist)
+      # This step is commented out as the provided code does not have tests, but it's a best practice.
+      # - name: Run backend tests
+      #   run: npm test
+      #   working-directory: ./Backend
+
+      # Step 5: Install frontend dependencies
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./Frontend
+
+      # Step 6: Create a single directory for the complete application build
+      - name: Create combined artifact directory
+        run: |
+          mkdir build
+          cp -r Backend build/backend
+          cp -r Frontend build/frontend
+
+      # Step 7: Upload the build directory as an artifact
+      - name: Upload artifact for deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: todo-app-build
+          path: build/
+
